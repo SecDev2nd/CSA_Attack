@@ -102,20 +102,13 @@ void process_packet(struct pcap_pkthdr *header, unsigned char *packet, char *sta
     // Random Channel set
     uint8_t channel = rand() % 13 + 1;
     unsigned char EPR[] = {0x2a, 0x01,0x00};
-    uint8_t csa_data[5] = {0x25, 0x03, 0x01, 0x0D, 0x3};
+    uint8_t csa_data[5] = {0x25, 0x03, 0x01, channel, 0x3};
     uint8_t broadcast_addr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     
+    //memcpy를 하고 길이를 수정해야 제대로 패킷이 생성됨
+    // 안그러면 망가짐
     memcpy(packet + header->caplen, csa_data, sizeof(csa_data));
     header->caplen += sizeof(csa_data);
-    // EPR을 찾고 CSA 데이터 삽입
-    // auto it = std::search(packet, packet + header->caplen, EPR, EPR + sizeof(EPR));
-    // if (it != NULL) {
-    //     size_t offset = it - packet;
-    //     memmove(packet + offset + sizeof(csa_data), packet + offset, header->caplen - offset);
-    //     memcpy(packet + offset, csa_data, 5);
-    // } else {
-    //     printf("EPR not found\n");
-    // }
 
     // Unicast 대상인 경우, destination_address 수정
     if (station_mac != NULL) {
